@@ -329,9 +329,9 @@ reg [19:1] cpu1_addr;
 always @(posedge clk_sys) begin
         reg        ioctl_wr_last = 0;
 
-        ioctl_wr_last <= ioctl_wr;
+        ioctl_wr_last <= (ioctl_wr  && !ioctl_index);
         if (ioctl_download) begin
-                if (~ioctl_wr_last && ioctl_wr) begin
+                if (~ioctl_wr_last && (ioctl_wr  && !ioctl_index)) begin
                         port1_req <= ~port1_req;
                         port2_req <= ~port2_req;
                 end
@@ -393,7 +393,7 @@ mcr3mono mcr3mono (
 
         .dl_addr(ioctl_addr-gfx1_offset),
         .dl_data(ioctl_dout),
-        .dl_wr(ioctl_wr)
+        .dl_wr(ioctl_wr && !ioctl_index)
 );
 
 
