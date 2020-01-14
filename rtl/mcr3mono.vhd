@@ -352,126 +352,124 @@ begin
 		hcnt  <= (others=>'0');
 		vcnt  <= (others=>'0');
 		top_frame <= '0';
-	elsif rising_edge(clock_vid) then
-		if pix_ena = '1' then
-
-			hcnt <= hcnt + 1;
-			if hcnt = 633 then
-				hcnt <= (others=>'0');
-				vcnt <= vcnt + 1;
-				if (vcnt = 524 and tv15Khz_mode = '0') or (vcnt = 263 and tv15Khz_mode = '1') then
-					vcnt <= (others=>'0');
-					top_frame <= not top_frame;
+	else 
+		if rising_edge(clock_vid) then
+			if pix_ena = '1' then
+		
+				hcnt <= hcnt + 1;
+				if hcnt = 633 then
+					hcnt <= (others=>'0');
+					vcnt <= vcnt + 1;
+					if (vcnt = 524 and tv15Khz_mode = '0') or (vcnt = 263 and tv15Khz_mode = '1') then
+						vcnt <= (others=>'0');
+						top_frame <= not top_frame;
+					end if;
 				end if;
-			end if;
-
-			if tv15Khz_mode = '0' then 
-						--	progessive mode
-
-				if vcnt = 490-1 then video_vs <= '0'; end if; -- front porch 10
-				if vcnt = 492-1 then video_vs <= '1'; end if; -- sync pulse   2
-																				 -- back porch  33 
-						
-				if hcnt = 512+13+9+6 then video_hs <= '0'; end if; -- front porch 16/25*20 = 13
-				if hcnt = 512+90+9+6 then video_hs <= '1'; end if; -- sync pulse  96/25*20 = 77
-																				   -- back porch  48/25*20 = 38
-                                video_hblank <= '1';
-                                if hcnt >= 2+16-1 and hcnt < 514+16-1 then
-                                   video_hblank <= '0';
-                                end if;
-
-                                video_vblank <= '1';
-                                if vcnt >= 1 and vcnt < 480 then
-                                   video_vblank <= '0';
-                                end if;
-
-				video_blankn <= '0';
-				if hcnt >= 2+16-1 and  hcnt < 514+16-1 and
-				  vcnt >= 2 and  vcnt < 481 then video_blankn <= '1';end if;
+			
+				if tv15Khz_mode = '0' then 
+					--	progessive mode
 				
-			else    -- interlaced mode
+					-- tune 31kHz vertical screen position here
+					if vcnt = 490-1 then video_vs <= '0'; end if; -- front porch 10
+					if vcnt = 492-1 then video_vs <= '1'; end if; -- sync pulse   2
+																				 -- back porch  33 
+					-- tune 31kHz horizontal screen position here	
+					if hcnt = 512+13+9+6 then video_hs <= '0'; end if; -- front porch 16/25*20 = 13
+					if hcnt = 512+90+9+6 then video_hs <= '1'; end if; -- sync pulse  96/25*20 = 77
+																				       -- back porch  48/25*20 = 38
+					video_hblank <= '1';
+					if hcnt >= 2+16+16 and hcnt < 514+16-1 then
+						video_hblank <= '0';
+					end if;
 
-				if hcnt = 530+22 then 
-					hs_cnt <= (others => '0');
-					if (vcnt = 240) then
-						vs_cnt <= (others => '0');
-					else
-						vs_cnt <= vs_cnt +1;
+					video_vblank <= '1';
+					if vcnt >= 2 and vcnt < 481 then
+						video_vblank <= '0';
+					end if;
+
+				else -- interlaced mode
+				 
+					if hcnt = 530+22 then            -- tune 15KHz horizontal screen position here
+						hs_cnt <= (others => '0');
+						if (vcnt = 240) then          -- tune 15KHz vertical screen position here
+							vs_cnt <= (others => '0');
+						else
+							vs_cnt <= vs_cnt +1;
+						end if;
+						
+						--if vcnt = 240 then video_vs <= '0'; end if;
+						--if vcnt = 242 then video_vs <= '1'; end if;
+
+					else 
+						hs_cnt <= hs_cnt + 1;
 					end if;
 					
+					video_hblank <= '1';
+					if hcnt >= 2+16 and hcnt < 514+16 then
+						video_hblank <= '0';
+					end if;
+
+					video_vblank <= '1';
+					if vcnt >= 1 and vcnt < 241 then
+						video_vblank <= '0';
+					end if;
+				
+					if    hs_cnt =  0 then hsync0 <= '0';
+					elsif hs_cnt = 47 then hsync0 <= '1';
+					end if;
+
+					if    hs_cnt =      0  then hsync1 <= '0';
+					elsif hs_cnt =     23  then hsync1 <= '1';
+					elsif hs_cnt = 317+ 0  then hsync1 <= '0';
+					elsif hs_cnt = 317+23  then hsync1 <= '1';
+					end if;
+			
+					if    hs_cnt =      0  then hsync2 <= '0';
+					elsif hs_cnt = 317-47  then hsync2 <= '1';
+					elsif hs_cnt = 317     then hsync2 <= '0';
+					elsif hs_cnt = 634-47  then hsync2 <= '1';
+					end if;
+
+					
+					if    hs_cnt =      0  then hsync3 <= '0';
+					elsif hs_cnt =     23  then hsync3 <= '1';
+					elsif hs_cnt = 317     then hsync3 <= '0';
+					elsif hs_cnt = 634-47  then hsync3 <= '1';
+					end if;
+
+					if    hs_cnt =      0  then hsync4 <= '0';
+					elsif hs_cnt = 317-47  then hsync4 <= '1';
+					elsif hs_cnt = 317     then hsync4 <= '0';
+					elsif hs_cnt = 317+23  then hsync4 <= '1';
+					end if;
+					
+					
+					if     vs_cnt =  1 then video_csync <= hsync1;
+					elsif  vs_cnt =  2 then video_csync <= hsync1;
+					elsif  vs_cnt =  3 then video_csync <= hsync1;
+					elsif  vs_cnt =  4 and top_frame = '1' then video_csync <= hsync3;
+					elsif  vs_cnt =  4 and top_frame = '0' then video_csync <= hsync1;
+					elsif  vs_cnt =  5 then video_csync <= hsync2;
+					elsif  vs_cnt =  6 then video_csync <= hsync2;
+					elsif  vs_cnt =  7 and  top_frame = '1' then video_csync <= hsync4;
+					elsif  vs_cnt =  7 and  top_frame = '0' then video_csync <= hsync2;
+					elsif  vs_cnt =  8 then video_csync <= hsync1;
+					elsif  vs_cnt =  9 then video_csync <= hsync1;
+					elsif  vs_cnt = 10 then video_csync <= hsync1;
+					elsif  vs_cnt = 11 then video_csync <= hsync0;
+					else                    video_csync <= hsync0;
+					end if;				
+				
 					if vcnt = 240 then video_vs <= '0'; end if;
 					if vcnt = 242 then video_vs <= '1'; end if;
-
-				else 
-					hs_cnt <= hs_cnt + 1;
+					if hcnt = 512+00+53 then video_hs <= '0'; end if;
+					if hcnt = 512+47+53 then video_hs <= '1'; end if;
 				end if;
-
-				video_blankn <= '0';
-				if hcnt >= 2+16 and  hcnt < 514+16 and
-					vcnt >= 1 and  vcnt < 241 then video_blankn <= '1';end if;
-
-                                video_hblank <= '1';
-                                if hcnt >= 2+16 and hcnt < 514+16 then
-                                   video_hblank <= '0';
-                                end if;
-
-                                video_vblank <= '1';
-                                if vcnt >= 1 and vcnt < 241 then
-                                   video_vblank <= '0';
-                                end if;
-
-				
-				if    hs_cnt =  0 then hsync0 <= '0';
-				elsif hs_cnt = 47 then hsync0 <= '1';
-				end if;
-
-				if    hs_cnt =      0  then hsync1 <= '0';
-				elsif hs_cnt =     23  then hsync1 <= '1';
-				elsif hs_cnt = 317+ 0  then hsync1 <= '0';
-				elsif hs_cnt = 317+23  then hsync1 <= '1';
-				end if;
-		
-				if    hs_cnt =      0  then hsync2 <= '0';
-				elsif hs_cnt = 317-47  then hsync2 <= '1';
-				elsif hs_cnt = 317     then hsync2 <= '0';
-				elsif hs_cnt = 634-47  then hsync2 <= '1';
-				end if;
-
-				
-				if    hs_cnt =      0  then hsync3 <= '0';
-				elsif hs_cnt =     23  then hsync3 <= '1';
-				elsif hs_cnt = 317     then hsync3 <= '0';
-				elsif hs_cnt = 634-47  then hsync3 <= '1';
-				end if;
-
-				if    hs_cnt =      0  then hsync4 <= '0';
-				elsif hs_cnt = 317-47  then hsync4 <= '1';
-				elsif hs_cnt = 317     then hsync4 <= '0';
-				elsif hs_cnt = 317+23  then hsync4 <= '1';
-				end if;
-				
-				
-				if     vs_cnt =  1 then video_csync <= hsync1;
-				elsif  vs_cnt =  2 then video_csync <= hsync1;
-				elsif  vs_cnt =  3 then video_csync <= hsync1;
-				elsif  vs_cnt =  4 and top_frame = '1' then video_csync <= hsync3;
-				elsif  vs_cnt =  4 and top_frame = '0' then video_csync <= hsync1;
-				elsif  vs_cnt =  5 then video_csync <= hsync2;
-				elsif  vs_cnt =  6 then video_csync <= hsync2;
-				elsif  vs_cnt =  7 and  top_frame = '1' then video_csync <= hsync4;
-				elsif  vs_cnt =  7 and  top_frame = '0' then video_csync <= hsync2;
-				elsif  vs_cnt =  8 then video_csync <= hsync1;
-				elsif  vs_cnt =  9 then video_csync <= hsync1;
-				elsif  vs_cnt = 10 then video_csync <= hsync1;
-				elsif  vs_cnt = 11 then video_csync <= hsync0;
-				else                    video_csync <= hsync0;
-				end if;	
 
 			end if;
 		end if;
 	end if;
 end process;
-
 ------------------------------------------
 -- cpu data input with address decoding --
 ------------------------------------------

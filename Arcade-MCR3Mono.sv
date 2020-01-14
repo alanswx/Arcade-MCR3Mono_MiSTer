@@ -117,17 +117,15 @@ localparam CONF_STR = {
 	"H0O2,Orientation,Vert,Horz;",
 	"O35,Scandoubler Fx,None,HQ2x,CRT 25%,CRT 50%,CRT 75%;",
 	"-;",
-	"OA,Accelerator,Digital,Analog;",
-	"OB,Steering,Digital,Analog;",
-	"-;",
+        "DIP;",
+        "-;",
 	"O6,Service,Off,On;",
-	"O8,Demo Sounds,Off,On;",
-	"O9,Show Lamps,Off,On;",
         "OD,Deinterlacer,Off,On;",
 	"-;",
 	"R0,Reset;",
-	"J1,Machine Gun,Missiles,Smoke Screen,Oil Slick,Weapon Truck,Gear Shift,Coin;",
-	"jn,A,B,X,Y,L,R,Start;",
+
+	"J1,Fire A, Fire B, Fire C, Fire D,Start 1,Coin;",
+	"jn,A,B,X,Y,Start,R;",
 	"V,v",`BUILD_DATE
 };
 
@@ -208,6 +206,9 @@ always @(posedge clk_sys) begin
 	mod_maxrpm	<= (mod == 3);
 end
 
+// load the DIPS
+reg [7:0] sw[8];
+always @(posedge clk_sys) if (ioctl_wr && (ioctl_index==254) && !ioctl_addr[24:3]) sw[ioctl_addr[2:0]] <= ioctl_dout;
 
 wire service=status[6];
 
@@ -231,7 +232,7 @@ always @(*) begin
         input0 = 8'hff;
         input1 = 8'hff;
         input2 = 8'hff;
-        input3 = 8'hff;
+        input3 = sw[0];
         input4 = 8'hff;
 
         if (mod_sarge  ) begin
@@ -469,8 +470,8 @@ reg btn_fire2C = 0;
 reg btn_fire2D = 0;
 
 // Generic controls - make a module from this?
-wire m_coin1   = btn_coin1_mame  | btn_coin;
-wire m_start1  = btn_start1_mame | btn_one_player;
+wire m_coin1   = btn_coin1_mame  | btn_coin | joystick_0[9];
+wire m_start1  = btn_start1_mame | btn_one_player | joystick_0[8];
 wire m_up1     = btn_up    | joystick_0[3];
 wire m_down1   = btn_down  | joystick_0[2];
 wire m_left1   = btn_left  | joystick_0[1];
@@ -480,8 +481,8 @@ wire m_fire1b  = btn_fireB | joystick_0[5];
 wire m_fire1c  = btn_fireC | joystick_0[6];
 wire m_fire1d  = btn_fireD | joystick_0[7];
 
-wire m_coin2   = btn_coin2_mame  | btn_coin;
-wire m_start2  = btn_start2_mame | btn_two_players;
+wire m_coin2   = btn_coin2_mame  | btn_coin | joystick_1[9];
+wire m_start2  = btn_start2_mame | btn_two_players | joystick_1[8];
 wire m_left2   = btn_left2  | joystick_1[1];
 wire m_right2  = btn_right2 | joystick_1[0];
 wire m_up2     = btn_up2    | joystick_1[3];
@@ -491,8 +492,8 @@ wire m_fire2b  = btn_fire2B | joystick_1[5];
 wire m_fire2c  = btn_fire2C | joystick_1[6];
 wire m_fire2d  = btn_fire2D | joystick_1[7];
 
-wire m_coin3   = btn_coin3_mame  | btn_coin;
-wire m_start3  = btn_start3_mame | btn_three_players;
+wire m_coin3   = btn_coin3_mame  | btn_coin | joystick_2[9];
+wire m_start3  = btn_start3_mame | btn_three_players | joystick_2[8];
 wire m_left3   = joystick_2[1];
 wire m_right3  = joystick_2[0];
 wire m_up3     = joystick_2[3];
@@ -502,8 +503,8 @@ wire m_fire3b  = joystick_2[5];
 wire m_fire3c  = joystick_2[6];
 wire m_fire3d  = joystick_2[7];
 
-wire m_coin4   = btn_coin4_mame  | btn_coin;
-wire m_start4  = btn_start4_mame | btn_four_players;
+wire m_coin4   = btn_coin4_mame  | btn_coin | joystick_3[9];
+wire m_start4  = btn_start4_mame | btn_four_players | joystick_3[8];
 wire m_left4   = joystick_3[1];
 wire m_right4  = joystick_3[0];
 wire m_up4     = joystick_3[3];
@@ -519,7 +520,7 @@ wire hs, vs;
 wire [2:0] r,g;
 wire [2:0] b;
 
-wire no_rotate = status[2] & ~direct_video;
+wire no_rotate = status[2]  | direct_video;
 
 reg ce_pix;
 always @(posedge clk_sys) begin
@@ -548,8 +549,8 @@ assign AUDIO_S = 0;
 wire  [9:0] audio;
 
 
-assign AUDIO_L = { audio, 5'd0 };
-assign AUDIO_R = { audio, 5'd0 };
+assign AUDIO_L = { audio, 6'd0 };
+assign AUDIO_R = { audio, 6'd0 };
 
 
 // MaxRPM gearbox
