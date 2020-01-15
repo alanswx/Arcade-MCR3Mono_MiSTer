@@ -48,9 +48,9 @@ module sdram (
 	input      [15:0] port1_d,
 	output reg [15:0] port1_q,
 
-	input      [16:1] cpu1_addr,
+	input      [19:1] cpu1_addr,
 	output reg [15:0] cpu1_q,
-	input      [16:1] cpu2_addr,
+	input      [19:1] cpu2_addr,
 	output reg [15:0] cpu2_q,
 
 	input             port2_req,
@@ -61,7 +61,7 @@ module sdram (
 	input      [15:0] port2_d,
 	output reg [31:0] port2_q,
 	
-	input      [16:2] sp_addr,
+	input      [17:2] sp_addr,
 	output reg [31:0] sp_q
 );
 
@@ -156,8 +156,8 @@ assign SDRAM_nWE  = sd_cmd[0];
 
 reg [24:1] addr_latch[2];
 reg [24:1] addr_latch_next[2];
-reg [16:1] addr_last[2];
-reg [16:2] addr_last2[2];
+reg [19:1] addr_last[2];
+reg [17:2] addr_last2[2];
 reg [15:0] din_latch[2];
 reg  [1:0] oe_latch;
 reg  [1:0] we_latch;
@@ -177,23 +177,23 @@ reg  [1:0] next_port[2];
 reg  [1:0] port[2];
 
 reg        refresh;
-reg [10:0] refresh_cnt;
-wire       need_refresh = (refresh_cnt >= RFRSH_CYCLES);
+reg [11:0] refresh_cnt;
+reg        need_refresh;
 
 // PORT1: bank 0,1
 always @(*) begin
 	if (refresh) begin
 		next_port[0] = PORT_NONE;
-		addr_latch_next[0] = addr_latch[0];
+		addr_latch_next[0] = addr_latch[1];
 	end else if (port1_req ^ port1_state) begin
 		next_port[0] = PORT_REQ;
 		addr_latch_next[0] = { 1'b0, port1_a };
 	end else if (cpu1_addr != addr_last[PORT_CPU1]) begin
 		next_port[0] = PORT_CPU1;
-		addr_latch_next[0] = { 8'd0, cpu1_addr };
+		addr_latch_next[0] = { 5'd0, cpu1_addr };
 	end else if (cpu2_addr != addr_last[PORT_CPU2]) begin
 		next_port[0] = PORT_CPU2;
-		addr_latch_next[0] = { 8'd0, cpu2_addr };
+		addr_latch_next[0] = { 5'd0, cpu2_addr };
 	end else begin
 		next_port[0] = PORT_NONE;
 		addr_latch_next[0] = addr_latch[0];
@@ -207,7 +207,7 @@ always @(*) begin
 		addr_latch_next[1] = { 1'b1, port2_a };
 	end else if (sp_addr != addr_last2[PORT_SP]) begin
 		next_port[1] = PORT_SP;
-		addr_latch_next[1] = { 1'b1, 7'd0, sp_addr, 1'b0 };
+		addr_latch_next[1] = { 1'b1, 6'd0, sp_addr, 1'b0 };
 	end else begin
 		next_port[1] = PORT_NONE;
 		addr_latch_next[1] = addr_latch[1];
@@ -221,6 +221,7 @@ always @(posedge clk) begin
 	SDRAM_DQ <= 16'bZ;
 	sd_cmd <= CMD_NOP;  // default: idle
 	refresh_cnt <= refresh_cnt + 1'd1;
+	need_refresh <= (refresh_cnt >= RFRSH_CYCLES);
 
 	if(init) begin
 		// initialization takes place at the end of the reset phase
@@ -253,7 +254,7 @@ always @(posedge clk) begin
 				sd_cmd <= CMD_ACTIVE;
 				SDRAM_A <= addr_latch_next[0][22:10];
 				SDRAM_BA <= addr_latch_next[0][24:23];
-				addr_last[next_port[0]] <= addr_latch_next[0][16:1];
+				addr_last[next_port[0]] <= addr_latch_next[0][19:1];
 				if (next_port[0] == PORT_REQ) begin
 					{ oe_latch[0], we_latch[0] } <= { ~port1_we, port1_we };
 					ds[0] <= port1_ds;
@@ -287,10 +288,8 @@ always @(posedge clk) begin
 					{ oe_latch[1], we_latch[1] } <= 2'b10;
 					ds[1] <= 2'b11;
 				end
-			end
-
-			if (next_port[1] == PORT_NONE && need_refresh && !we_latch[0] && !oe_latch[0]) begin
-				refresh <= 1'b1;
+			end else if (need_refresh && !oe_latch[0] & !we_latch[0]) begin
+				refresh <= 1;
 				refresh_cnt <= 0;
 				sd_cmd <= CMD_AUTO_REFRESH;
 			end
